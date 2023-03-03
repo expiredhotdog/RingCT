@@ -1,0 +1,53 @@
+on: [push, pull_request]
+
+name: Test
+
+jobs:
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - nightly-2022-12-10
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - name: test/debug
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - name: test/release
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release
+      - name: test/debug all features
+        if: ${{ matrix.rust != 'stable' }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
+      - name: test/release all features
+        if: ${{ matrix.rust != 'stable' }}
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release --all-features
+      - name: docs build
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --features u64_backend
+      - name: bench
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --benches

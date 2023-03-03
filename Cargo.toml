@@ -1,0 +1,45 @@
+[package]
+name = "ringct"
+version = "0.1.0"
+edition = "2021"
+description = "A fast, stable, pure-Rust implementation of RingCT using Ristretto"
+
+[dependencies]
+curve25519-dalek = {version = "3.2.1", features = ["serde"]}
+sha2 = "0.10.6"
+rand = "0.8.5"
+lazy_static = "1.4.0"
+serde = "1.0.152"
+zeroize = "1"
+bulletproofs-plus = { package = "tari_bulletproofs_plus", path = "bulletproofs-plus" }
+
+bincode = {version = "1.3.3", optional = true}
+
+[dev-dependencies]
+criterion = "0.4"
+
+[features]
+default = ["to_bytes"]
+to_bytes = ["dep:bincode"]
+
+#curve bench isn't useful to the user
+#[[bench]]
+#name = "curve"
+#harness = false
+
+[[bench]]
+name = "rangeproof"
+harness = false
+[[bench]]
+name = "signature"
+harness = false
+[[bench]]
+name = "address"
+harness = false
+
+[[test]]
+name = "rangeproof"
+[[test]]
+name = "signature"
+[[test]]
+name = "address"
