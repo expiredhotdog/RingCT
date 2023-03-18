@@ -6,9 +6,9 @@
 
 //! Elliptic curve functions and constants
 
-#[cfg(feature = "to_bytes")]
+
 use crate::errors::SerializationError;
-#[cfg(feature = "to_bytes")]
+
 use crate::tobytes::*;
 
 pub use curve25519_dalek::{
@@ -66,19 +66,26 @@ pub fn batch_encode_points(points: &Vec<RistrettoPoint>) -> Vec<[u8; 32]> {
     return encoded
 }
 
-///return a random scalar
-pub fn random_scalar() -> Scalar {
-    let mut scalar_bytes = [0u8; 64];
-    thread_rng().fill(&mut scalar_bytes[..]);
-    return Scalar::from_bytes_mod_order_wide(&scalar_bytes);
+///Implements `generate` method for generating random `Scalar`'s and `RistrettoPoint`'s.
+pub trait Random {
+    fn generate() -> Self;
+
+} impl Random for Scalar {
+    ///return a random scalar
+    fn generate() -> Scalar {
+        let mut scalar_bytes = [0u8; 64];
+        thread_rng().fill(&mut scalar_bytes[..]);
+        return Scalar::from_bytes_mod_order_wide(&scalar_bytes);
+    }
+
+} impl Random for RistrettoPoint {
+    ///return a random scalar
+    fn generate() -> RistrettoPoint {
+        return &Scalar::generate() * G;
+    }
 }
 
-///return a random point on the curve
-pub fn random_point() -> RistrettoPoint {
-    return &random_scalar() * G;
-}
 
-#[cfg(feature = "to_bytes")]
 impl ToBytes<'_> for Scalar {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok(self.reduce().to_bytes().to_vec())
@@ -97,7 +104,7 @@ impl ToBytes<'_> for Scalar {
     }
 }
 
-#[cfg(feature = "to_bytes")]
+
 impl ToBytes<'_> for RistrettoPoint {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok(self.compress().to_bytes().to_vec());

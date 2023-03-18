@@ -136,7 +136,7 @@ fn borromean_sign(rings: &Vec<Vec<RistrettoPoint>>, sk: &Vec<Scalar>, indices: V
     for i in 0..NUMBER_OF_PROOF_DIGITS {
         let mut s_ring: [Scalar; 4] = [FILLER_SCALAR; 4];
         for j in 0..4 {
-            s_ring[j] = random_scalar();
+            s_ring[j] = Scalar::generate();
         }
         s[i] = s_ring;
     }
@@ -144,7 +144,7 @@ fn borromean_sign(rings: &Vec<Vec<RistrettoPoint>>, sk: &Vec<Scalar>, indices: V
     //random starting values
     let mut e_start: Vec<Scalar> = Vec::new();
     for _ in rings {
-        e_start.push(random_scalar());
+        e_start.push(Scalar::generate());
     }
 
     let mut e_0: Vec<(Scalar, Scalar, RistrettoPoint)> = Vec::new();
@@ -240,7 +240,7 @@ pub struct BorromeanRangeProof {
                 let r_total: Scalar = r.iter().sum();
                 r_i = blinding - r_total;
             } else {
-                r_i = random_scalar();
+                r_i = Scalar::generate();
             }
             r.push(r_i);
 
@@ -303,4 +303,4 @@ pub struct BorromeanRangeProof {
         return borromean_verify(&rings, &proof, &encode_point(&commitment.0))
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for BorromeanRangeProof {}
+} impl ToBytes<'_> for BorromeanRangeProof {}

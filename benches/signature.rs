@@ -20,9 +20,9 @@ use ringct::{
 
 fn random_enote_keys() -> EnoteKeys {
     return EnoteKeys {
-        owner: random_scalar(),
+        owner: Scalar::generate(),
         value: thread_rng().gen::<u64>(),
-        blinding: random_scalar()
+        blinding: Scalar::generate()
     }
 }
 
@@ -40,7 +40,7 @@ fn clsag_benchmark(c: &mut Criterion) {
             enotes.push(_enote_keys.to_enote());
         }
         let my_key = &enote_keys[thread_rng().gen::<usize>() % x];
-        let out_blinding = random_scalar();
+        let out_blinding = Scalar::generate();
 
         let params = (enotes, my_key.to_owned(), out_blinding);
         group.bench_with_input(BenchmarkId::new("sign", format!("Ring size: {x}")), &params,
@@ -59,7 +59,7 @@ fn clsag_benchmark(c: &mut Criterion) {
             enotes.push(_enote_keys.to_enote());
         }
         let my_key = &enote_keys[thread_rng().gen::<usize>() % x];
-        let out_blinding = random_scalar();
+        let out_blinding = Scalar::generate();
         let sig = CLSAGSignature::sign_unsorted(&enotes, my_key.to_owned(), out_blinding, b"abcdef").unwrap();
 
         let params = (sig.1, enotes, sig.0);
@@ -84,7 +84,7 @@ fn mlsag_benchmark(c: &mut Criterion) {
             enotes.push(_enote_keys.to_enote());
         }
         let my_key = &enote_keys[thread_rng().gen::<usize>() % x];
-        let out_blinding = random_scalar();
+        let out_blinding = Scalar::generate();
 
         let params = (enotes, my_key.to_owned(), out_blinding);
         group.bench_with_input(BenchmarkId::new("sign", format!("Ring size: {x}")), &params,
@@ -103,7 +103,7 @@ fn mlsag_benchmark(c: &mut Criterion) {
             enotes.push(_enote_keys.to_enote());
         }
         let my_key = &enote_keys[thread_rng().gen::<usize>() % x];
-        let out_blinding = random_scalar();
+        let out_blinding = Scalar::generate();
         let sig = MLSAGSignature::sign_unsorted(&enotes, my_key.to_owned(), out_blinding, b"abcdef").unwrap();
 
         let params = (sig.1, enotes, sig.0);

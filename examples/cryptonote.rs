@@ -1,8 +1,14 @@
 // SPDX short identifier: Unlicense
 
-use ringct::address::{
-    ECDHPrivateKey,
-    cryptonote::CryptoNotePrivate
+use ringct::{
+    curve::{
+        Scalar,
+        Random
+    },
+    address::{
+        ECDHPrivateKey,
+        cryptonote::CryptoNotePrivate
+    }
 };
 
 fn main() {
@@ -13,7 +19,7 @@ fn main() {
     let public_key_1 = private_key_1.to_public();
 
     //Create user B's keys
-    let private_key_2 = ECDHPrivateKey::generate();
+    let private_key_2 = Scalar::generate();
     let public_key_2 = private_key_2.to_public();
 
     //Calculate the shared secret between A and B

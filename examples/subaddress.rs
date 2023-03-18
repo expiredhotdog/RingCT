@@ -1,8 +1,14 @@
 // SPDX short identifier: Unlicense
 
-use ringct::address::{
-    ECDHPrivateKey,
-    subaddress::MasterPrivateKeys
+use ringct::{
+    curve::{
+        Scalar,
+        Random
+    },
+    address::{
+        ECDHPrivateKey,
+        subaddress::MasterPrivateKeys
+    },
 };
 
 fn main() {
@@ -22,7 +28,7 @@ fn main() {
         .expect("Real software should have proper error handling.");
 
     //Create user B's keys
-    let private_key_2 = ECDHPrivateKey::generate();
+    let private_key_2 = Scalar::generate();
 
     //Deriving a public key from a subaddress produces a "transaction public key",
     //which must be known by the receiver to derive the private key.

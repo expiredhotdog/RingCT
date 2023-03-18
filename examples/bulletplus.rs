@@ -1,7 +1,10 @@
 // SPDX short identifier: Unlicense
 
 use ringct::{
-    curve::random_scalar,
+    curve::{
+        Scalar,
+        Random
+    },
     rangeproof::BulletPlusRangeProof
 };
 
@@ -12,7 +15,7 @@ fn main() {
         //https://web.getmonero.org/resources/moneropedia/atomic-units.html)
     let values = vec!(123456789, 2222222, 8, 69420);
     //blinding factors of the Pedersen commitments
-    let blindings = vec!(random_scalar(), random_scalar(), random_scalar(), random_scalar());
+    let blindings = vec!(Scalar::generate(), Scalar::generate(), Scalar::generate(), Scalar::generate());
 
     //Create an aggregated rangeproof,
     //proving that all of the given values are valid 64-bit integers (between 0 and 2^64 - 1).
@@ -29,13 +32,13 @@ fn main() {
 
     //Create another rangeproof
     let values = vec!(123, 0, 42069);
-    let blindings = vec!(random_scalar(), random_scalar(), random_scalar());
-    let (commitments2, proof2) = BulletPlusRangeProof::prove(
+    let blindings = vec!(Scalar::generate(), Scalar::generate(), Scalar::generate());
+    let (commitments_2, proof2) = BulletPlusRangeProof::prove(
         values, blindings).unwrap();
 
     //Batch verify multiple rangeproofs at once.
     //This is a lot more efficient than verifying them individually!
-    let batched_commitments = vec!(commitments, commitments2);
+    let batched_commitments = vec!(commitments, commitments_2);
     let batched_proofs = vec!(proof, proof2);
     BulletPlusRangeProof::batch_verify(batched_commitments, batched_proofs)
         .expect("Real software should have proper error handling.");

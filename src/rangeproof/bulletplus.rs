@@ -236,7 +236,7 @@ pub struct BulletPlusRangeProof (
         }
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for BulletPlusRangeProof {
+} impl ToBytes<'_> for BulletPlusRangeProof {
     //TariRangeProof has its own encoding system so we don't need bincode
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok(self.0.to_bytes());

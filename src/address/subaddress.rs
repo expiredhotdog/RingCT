@@ -13,7 +13,10 @@ use std::collections::HashMap;
 use zeroize::Zeroize;
 
 use crate::internal_common::*;
-use super::ecdh::*;
+use super::{
+    ecdh::*,
+    Recipient
+};
 
 
 ///Lookup table for recovering private keys
@@ -74,8 +77,8 @@ trait LookupTableProtocol<S: Zeroize> {
 ///The `Serialize` and `Deserialize` traits are much less compact, but faster to process.
 #[derive(Debug, Clone, Serialize, Deserialize, Zeroize)]
 pub struct MasterPrivateKeys {
-    pub view: ECDHPrivateKey,
-    pub spend: ECDHPrivateKey,
+    pub view: Scalar,
+    pub spend: Scalar,
 
     table: Option<LookupTable>
 
@@ -84,23 +87,23 @@ pub struct MasterPrivateKeys {
     pub(crate) fn get_subkey_unchecked(&self, coordinates: (u32, u32)) -> Scalar {
         //b + H(a,x,y)
         let msg = [
-            self.view.as_scalar().as_bytes().as_slice(),
+            self.view.as_bytes().as_slice(),
             &coordinates.0.to_le_bytes(),
             &coordinates.0.to_le_bytes()
         ].concat();
-        return self.spend.as_scalar() + domain_h_scalar(&msg, domains::SUBADDRESS_SUB_PRIVATE_SPEND)
+        return self.spend + domain_h_scalar(&msg, domains::SUBADDRESS_SUB_PRIVATE_SPEND)
     }
 
     ///Get the private spend key for the subaddress at the given coordinates.
     ///
     ///If those coordinates are uninitialized, return `Err(SubaddressError)`.
-    pub(crate) fn get_subaddress_key(&self, coordinates: (u32, u32)) -> Result<ECDHPrivateKey, SubaddressError> {
+    pub(crate) fn get_subaddress_key(&self, coordinates: (u32, u32)) -> Result<Scalar, SubaddressError> {
         if self.get_table()?.secrets.get(&coordinates).is_none() {
             return Err(SubaddressError::UninitializedCoordinates)
         }
         return Ok(
-            ECDHPrivateKey::from_scalar(self.get_subkey_unchecked(coordinates)
-        ))
+            self.get_subkey_unchecked(coordinates)
+        )
     }
 
 
@@ -174,12 +177,12 @@ pub struct MasterPrivateKeys {
     ///If the coordinates are not initialized, return `Err(SubaddressError)`.
     pub fn get_subaddress(&self, coordinates: (u32, u32)) -> Result<SubaddressPublic, SubaddressError> {
         //(b + H(a,x,y)) * G
-        let spend = &self.get_subaddress_key(coordinates)?.as_scalar() * G;
+        let spend = &self.get_subaddress_key(coordinates)? * G;
 
         return Ok(SubaddressPublic{
-            spend: ECDHPublicKey::from_point(spend),
+            spend,
             //C = a * D
-            view: ECDHPublicKey::from_point(self.view.as_scalar() * spend)
+            view: self.view * spend
         })
     }
 
@@ -187,18 +190,18 @@ pub struct MasterPrivateKeys {
     ///Given a public key, calculate the "shared secret" of these keys.
     ///
     ///**The transaction public key should not be reused.**
-    pub fn shared_secret(&self, transaction_key: &ECDHPublicKey) -> SharedSecret {
-        return SharedSecret::get(self.view.as_scalar(), &transaction_key.as_point())
+    pub fn shared_secret(&self, transaction_key: &RistrettoPoint) -> SharedSecret {
+        return SharedSecret::get(self.view, &transaction_key)
     }
 
     ///Given a public key and shared secret, determine the coordinates of the subaddress that the key was derived from.
     ///
     ///Returns `Ok((x, y))` if successful.
     ///If the private key cannot be found, returns `Err(SubaddressError)`.
-    pub fn recover_coordinates(&self, public_key: ECDHPublicKey, shared_secret: SharedSecret) -> Result<(u32, u32), SubaddressError> {
+    pub fn recover_coordinates(&self, public_key: RistrettoPoint, shared_secret: SharedSecret) -> Result<(u32, u32), SubaddressError> {
         let table = self.get_table()?;
         //D' = P - H(aR)G
-        return match table.coords.get(&(public_key.as_point() - (&shared_secret.as_scalar() * G)).compress()) {
+        return match table.coords.get(&(public_key - (&shared_secret.as_scalar() * G)).compress()) {
             Some(coords) => Ok(*coords),
             None => Err(SubaddressError::KeyNotFound)
         }
@@ -208,11 +211,11 @@ pub struct MasterPrivateKeys {
     ///**These keys should never be reused.**
     ///
     ///If the coordinates are not initialized, return `Err(SubaddressError)`.
-    pub fn derive_key(&self, shared_secret: SharedSecret, coordinates: (u32, u32)) -> Result<ECDHPrivateKey, SubaddressError> {
+    pub fn derive_key(&self, shared_secret: SharedSecret, coordinates: (u32, u32)) -> Result<Scalar, SubaddressError> {
         let table = self.get_table()?;
         //p = H(aR) + b + H(a,x,y)
         return match table.secrets.get(&coordinates) {
-            Some(key) => Ok(ECDHPrivateKey::from_scalar(key + shared_secret.as_scalar())),
+            Some(key) => Ok(key + shared_secret.as_scalar()),
             None => Err(SubaddressError::KeyNotFound)
         }
     }
@@ -220,25 +223,66 @@ pub struct MasterPrivateKeys {
 
     ///Generate a random new private key.
     pub fn generate() -> Self {
-        let private_view = ECDHPrivateKey::from_scalar(random_scalar());
-        let private_spend = ECDHPrivateKey::from_scalar(random_scalar());
+        let private_view = Scalar::generate();
+        let private_spend = Scalar::generate();
 
         return Self::from_keys(private_view, private_spend)
     }
 
     ///Import from private keys.
-    pub fn from_keys(private_view_key: ECDHPrivateKey, private_spend_key: ECDHPrivateKey) -> Self {
+    pub fn from_keys(private_view_key: Scalar, private_spend_key: Scalar) -> Self {
         return Self{view: private_view_key, spend: private_spend_key, table: None}
     }
 
     ///Deterministically convert a seed into a Subaddress private key.
     pub fn from_seed(bytes: [u8; 32]) -> Self {
-        let private_view = ECDHPrivateKey::from_scalar(
-            domain_h_scalar(&bytes, domains::SUBADDRESS_MASTER_PRIVATE_VIEW));
-        let private_spend = ECDHPrivateKey::from_scalar(
-            domain_h_scalar(&bytes, domains::SUBADDRESS_MASTER_PRIVATE_SPEND));
+        let private_view = domain_h_scalar(&bytes, domains::SUBADDRESS_MASTER_PRIVATE_VIEW);
+        let private_spend = domain_h_scalar(&bytes, domains::SUBADDRESS_MASTER_PRIVATE_SPEND);
 
         return Self::from_keys(private_view, private_spend)
+    }
+
+    ///"Receive" a payment, decrypting its content, given the pedersen commitment.
+    ///
+    ///**Make sure that the appropiate coordinates are initialized first!**
+    ///Otherwise the payment won't be recognized.
+    ///
+    ///Returns `Some(EnoteKeys)` if the enote belongs to these keys, or `None` if not.
+    pub fn receive(&self, recipient: &Recipient, commitment: &Commitment) -> Option<EnoteKeys> {
+        fn receive_inner(
+            master_keys: &MasterPrivateKeys, recipient: &Recipient, commitment: &Commitment
+        ) -> Result<EnoteKeys, SubaddressError> {
+            //check view tag
+            let transaction_key = match recipient.transaction_key {
+                Some(key) => key,
+                None => return Err(SubaddressError::Unspecified("".to_string()))
+            };
+            let shared_secret = master_keys.shared_secret(&transaction_key);
+            if shared_secret.get_view_tag() != recipient.view_tag {
+                return Err(SubaddressError::Unspecified("".to_string()))
+            }
+
+            //check public key
+            let coordinates = master_keys.recover_coordinates(recipient.public_key, shared_secret.clone())?;
+            let owner = master_keys.derive_key(shared_secret.clone(), coordinates)?;
+
+            //check commitment
+            let value = shared_secret.decrypt_amount(recipient.encrypted_amount);
+            let blinding = shared_secret.as_scalar();
+            if Commitment::commit(value, blinding) != *commitment {
+                return Err(SubaddressError::Unspecified("".to_string()))
+            }
+
+            return Ok(EnoteKeys{
+                owner,
+                value,
+                blinding
+            })
+        }
+        if let Ok(keys) = receive_inner(self, recipient, commitment) {
+            return Some(keys)
+        }
+        return None
     }
 
 
@@ -290,19 +334,19 @@ pub struct MasterPrivateKeys {
 
     ///Export these private keys.
     ///The lookup table, regardless of whether or not it is initialized, is **not** included.
-    #[cfg(feature = "to_bytes")]
+
     pub fn export_keys(&self) -> Result<Vec<u8>, SerializationError> {
-        return Ok([self.view.to_bytes()?, self.spend.to_bytes()?].concat())
+        return Ok([self.view.to_bytes(), self.spend.to_bytes()].concat())
     }
 
     ///Import encoded private keys.
-    #[cfg(feature = "to_bytes")]
+
     pub fn import_keys(bytes: &[u8]) -> Result<Self, SerializationError> {
         if bytes.len() != 64 {
             return Err(SerializationError::DecodingError)
         }
-        let private_view = ECDHPrivateKey::from_bytes(&bytes[0..32])?;
-        let private_spend = ECDHPrivateKey::from_bytes(&bytes[32..64])?;
+        let private_view = Scalar::from_bytes(&bytes[0..32])?;
+        let private_spend = Scalar::from_bytes(&bytes[32..64])?;
 
         return Ok(Self::from_keys(private_view, private_spend))
     }
@@ -318,7 +362,7 @@ impl Drop for MasterPrivateKeys {
         self.zeroize()
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for MasterPrivateKeys {
+} impl ToBytes<'_> for MasterPrivateKeys {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok([self.export_keys()?, self.export_coordinates().or(Ok(vec!()))?].concat())
     }
@@ -345,8 +389,8 @@ impl Drop for MasterPrivateKeys {
 ///The `Serialize` and `Deserialize` traits are much less compact, but faster to process.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MasterPrivateView {
-    pub view: ECDHPrivateKey,
-    pub spend: ECDHPublicKey,
+    pub view: Scalar,
+    pub spend: RistrettoPoint,
 
     table: Option<LookupTableView>
 
@@ -355,23 +399,23 @@ pub struct MasterPrivateView {
     pub(crate) fn get_subkey_unchecked(&self, coordinates: (u32, u32)) -> RistrettoPoint {
         //b + H(a,x,y)
         let msg = [
-            self.view.as_scalar().as_bytes().as_slice(),
+            self.view.as_bytes().as_slice(),
             &coordinates.0.to_le_bytes(),
             &coordinates.0.to_le_bytes()
         ].concat();
-        return self.spend.as_point() + (&domain_h_scalar(&msg, domains::SUBADDRESS_SUB_PRIVATE_SPEND) * G)
+        return self.spend + (&domain_h_scalar(&msg, domains::SUBADDRESS_SUB_PRIVATE_SPEND) * G)
     }
 
     ///Get the public spend key for the subaddress at the given coordinates.
     ///
     ///If those coordinates are uninitialized, return `Err(SubaddressError)`.
-    pub(crate) fn get_subaddress_key(&self, coordinates: (u32, u32)) -> Result<ECDHPublicKey, SubaddressError> {
+    pub(crate) fn get_subaddress_key(&self, coordinates: (u32, u32)) -> Result<RistrettoPoint, SubaddressError> {
         if self.get_table()?.secrets.get(&coordinates).is_none() {
             return Err(SubaddressError::UninitializedCoordinates)
         }
         return Ok(
-            ECDHPublicKey::from_point(self.get_subkey_unchecked(coordinates)
-        ))
+            self.get_subkey_unchecked(coordinates)
+        )
     }
 
 
@@ -436,12 +480,12 @@ pub struct MasterPrivateView {
     ///If the coordinates are not initialized, return `Err(SubaddressError)`.
     pub fn get_subaddress(&self, coordinates: (u32, u32)) -> Result<SubaddressPublic, SubaddressError> {
         //(b + H(a,x,y)) * G
-        let spend = &self.get_subaddress_key(coordinates)?.as_point();
+        let spend = &self.get_subaddress_key(coordinates)?;
 
         return Ok(SubaddressPublic{
-            spend: ECDHPublicKey::from_point(*spend),
+            spend: *spend,
             //C = a * D
-            view: ECDHPublicKey::from_point(self.view.as_scalar() * spend)
+            view: self.view * spend
         })
     }
 
@@ -449,18 +493,18 @@ pub struct MasterPrivateView {
     ///Given a public key, calculate the "shared secret" of these keys.
     ///
     ///**The transaction public key should not be reused.**
-    pub fn shared_secret(&self, transaction_key: &ECDHPublicKey) -> SharedSecret {
-        return SharedSecret::get(self.view.as_scalar(), &transaction_key.as_point())
+    pub fn shared_secret(&self, transaction_key: &RistrettoPoint) -> SharedSecret {
+        return SharedSecret::get(self.view, &transaction_key)
     }
 
     ///Given a public key and shared secret, determine the coordinates of the subaddress that the key was derived from.
     ///
     ///Returns `Ok((x, y))` if successful.
     ///If the private key cannot be found, returns `Err(SubaddressError)`.
-    pub fn recover_coordinates(&self, public_key: ECDHPublicKey, shared_secret: SharedSecret) -> Result<(u32, u32), SubaddressError> {
+    pub fn recover_coordinates(&self, public_key: RistrettoPoint, shared_secret: SharedSecret) -> Result<(u32, u32), SubaddressError> {
         let table = self.get_table()?;
         //D' = P - H(aR)G
-        return match table.coords.get(&(public_key.as_point() - (&shared_secret.as_scalar() * G)).compress()) {
+        return match table.coords.get(&(public_key - (&shared_secret.as_scalar() * G)).compress()) {
             Some(coords) => Ok(*coords),
             None => Err(SubaddressError::KeyNotFound)
         }
@@ -470,18 +514,56 @@ pub struct MasterPrivateView {
     ///**These keys should never be reused.**
     ///
     ///If the coordinates are not initialized, return `Err(SubaddressError)`.
-    pub fn derive_key(&self, shared_secret: SharedSecret, coordinates: (u32, u32)) -> Result<ECDHPublicKey, SubaddressError> {
+    pub fn derive_key(&self, shared_secret: SharedSecret, coordinates: (u32, u32)) -> Result<RistrettoPoint, SubaddressError> {
         let table = self.get_table()?;
         //p = H(aR) + b + H(a,x,y)
         return match table.secrets.get(&coordinates) {
-            Some(key) => Ok(ECDHPublicKey::from_point(key + (&shared_secret.as_scalar() * G))),
+            Some(key) => Ok(key + (&shared_secret.as_scalar() * G)),
             None => Err(SubaddressError::KeyNotFound)
         }
     }
 
     ///Import from a private view key and a public spend key.
-    pub fn from_keys(private_view_key: ECDHPrivateKey, public_spend_key: ECDHPublicKey) -> Self {
+    pub fn from_keys(private_view_key: Scalar, public_spend_key: RistrettoPoint) -> Self {
         return Self{view: private_view_key, spend: public_spend_key, table: None}
+    }
+
+    ///"Receive" a payment, decrypting its content, given the pedersen commitment.
+    ///
+    ///**Make sure that the appropiate coordinates are initialized first!**
+    ///Otherwise the payment won't be recognized.
+    ///
+    ///Returns the amount and blinding factor of the pedersen commitment if the enote belongs to these keys, or `None` if not.
+    pub fn receive(&self, recipient: &Recipient, commitment: &Commitment) -> Option<(u64, Scalar)> {
+        fn receive_inner(
+            master_keys: &MasterPrivateView, recipient: &Recipient, commitment: &Commitment
+        ) -> Result<(u64, Scalar), SubaddressError> {
+            //check view tag
+            let transaction_key = match recipient.transaction_key {
+                Some(key) => key,
+                None => return Err(SubaddressError::Unspecified("".to_string()))
+            };
+            let shared_secret = master_keys.shared_secret(&transaction_key);
+            if shared_secret.get_view_tag() != recipient.view_tag {
+                return Err(SubaddressError::Unspecified("".to_string()))
+            }
+
+            //check public key
+            master_keys.recover_coordinates(recipient.public_key, shared_secret.clone())?;
+
+            //check commitment
+            let value = shared_secret.decrypt_amount(recipient.encrypted_amount);
+            let blinding = shared_secret.as_scalar();
+            if Commitment::commit(value, blinding) != *commitment {
+                return Err(SubaddressError::Unspecified("".to_string()))
+            }
+
+            return Ok((value, blinding))
+        }
+        if let Ok(keys) = receive_inner(self, recipient, commitment) {
+            return Some(keys)
+        }
+        return None
     }
 
     ///Export the lookup table's initialized coordinates for these keys.
@@ -532,19 +614,19 @@ pub struct MasterPrivateView {
 
     ///Export these keys.
     ///The lookup table, regardless of whether or not it is initialized, is **not** included.
-    #[cfg(feature = "to_bytes")]
+
     pub fn export_keys(&self) -> Result<Vec<u8>, SerializationError> {
-        return Ok([self.view.to_bytes()?, self.spend.to_bytes()?].concat())
+        return Ok([self.view.to_bytes(), self.spend.compress().to_bytes()].concat())
     }
 
     ///Import encoded private keys.
-    #[cfg(feature = "to_bytes")]
+
     pub fn import_keys(bytes: &[u8]) -> Result<Self, SerializationError> {
         if bytes.len() != 64 {
             return Err(SerializationError::DecodingError)
         }
-        let private_view = ECDHPrivateKey::from_bytes(&bytes[0..32])?;
-        let public_spend = ECDHPublicKey::from_bytes(&bytes[32..64])?;
+        let private_view = Scalar::from_bytes(&bytes[0..32])?;
+        let public_spend = RistrettoPoint::from_bytes(&bytes[32..64])?;
 
         return Ok(Self::from_keys(private_view, public_spend))
     }
@@ -566,7 +648,7 @@ impl Zeroize for MasterPrivateView {
         self.zeroize()
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for MasterPrivateView {
+} impl ToBytes<'_> for MasterPrivateView {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok([self.export_keys()?, self.export_coordinates().or(Ok(vec!()))?].concat())
     }
@@ -586,29 +668,53 @@ impl Zeroize for MasterPrivateView {
 ///Public keys of a subaddress.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubaddressPublic {
-    pub view: ECDHPublicKey,
-    pub spend: ECDHPublicKey
+    pub view: RistrettoPoint,
+    pub spend: RistrettoPoint
 
 } impl SubaddressPublic {
     ///Given a private key, calculate the "shared secret" of these keys,
     ///and the public transaction key needed for the recipient to recreate the shared secret.
     ///
     ///**The private key and transaction key should not be reused.**
-    pub fn shared_secret(&self, other_private: ECDHPrivateKey) -> (SharedSecret, ECDHPublicKey) {
+    pub fn shared_secret(&self, other_private: Scalar) -> (SharedSecret, RistrettoPoint) {
         return (
-            SharedSecret::get(other_private.as_scalar(), &self.view.as_point()),
-            other_private.to_public_with_base(self.spend.as_point())
+            SharedSecret::get(other_private, &self.view),
+            other_private.to_public_with_base(self.spend)
         )
     }
 
     ///Derive the unique ephemeral public key given a shared secret.
     ///**These keys should never be reused.**
-    pub fn derive_key(&self, shared_secret: SharedSecret) -> ECDHPublicKey {
-        return ECDHPublicKey::from_point(
-            self.spend.as_point() + (&shared_secret.as_scalar() * G))
+    pub fn derive_key(&self, shared_secret: SharedSecret) -> RistrettoPoint {
+        return self.spend + (&shared_secret.as_scalar() * G)
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for SubaddressPublic {
+    ///"Send" to this address, where only the recipient can detect that the payment is for them.
+    ///
+    ///The transaction/ECDH key is generated automatically.
+    ///
+    ///Returns the blinding factor of the pedersen commitment (for use in a rangeproof),
+    ///and the public data for the receiver to detect the payment.
+    pub fn send(&self, amount: u64) -> (Scalar, Recipient) {
+        let seed = batch_encode_points(&vec!(self.view, self.spend)).concat();
+        let seed = h_scalar(&[seed, amount.to_le_bytes().to_vec()].concat());
+        let transaction_sk = seed + Scalar::generate();
+
+        let (shared_secret, transaction_key) = self.shared_secret(transaction_sk);
+        let view_tag = shared_secret.get_view_tag();
+        let encrypted_amount = shared_secret.encrypt_amount(amount);
+        let blinding = shared_secret.as_scalar();
+
+        let recipient = Recipient {
+            public_key: self.derive_key(shared_secret),
+            transaction_key: Some(transaction_key),
+            view_tag,
+            encrypted_amount
+        };
+        return (blinding, recipient)
+    }
+
+} impl ToBytes<'_> for SubaddressPublic {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok([self.view.to_bytes()?, self.spend.to_bytes()?].concat())
     }
@@ -619,8 +725,8 @@ pub struct SubaddressPublic {
         }
 
         return Ok(Self{
-            view: ECDHPublicKey::from_bytes(&bytes[0..32])?,
-            spend: ECDHPublicKey::from_bytes(&bytes[32..64])?
+            view: RistrettoPoint::from_bytes(&bytes[0..32])?,
+            spend: RistrettoPoint::from_bytes(&bytes[32..64])?
         })
     }
 }

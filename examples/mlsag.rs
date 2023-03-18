@@ -2,8 +2,9 @@
 
 use ringct::{
     curve::{
-        random_scalar,
-        random_point
+        Scalar,
+        RistrettoPoint,
+        Random
     },
     Commitment,
     EnoteKeys,
@@ -24,10 +25,10 @@ fn main() {
     //In practice this would probably be created as an output of a previous transaction,
     //but for demonstration it will just be randomly generated.
     let signer_keys = EnoteKeys::new(
-        random_scalar(),    //owning private key
+        Scalar::generate(),    //owning private key
         123456,             //value of the enote (in atomic units, for example piconeros:
                                 //https://web.getmonero.org/resources/moneropedia/atomic-units.html)
-        random_scalar(),    //blinding factor of the Pedersen commitment
+        Scalar::generate(),    //blinding factor of the Pedersen commitment
     );
     let signer_enote = signer_keys.to_enote();
 
@@ -37,8 +38,8 @@ fn main() {
         //Create random fake enotes to act as decoys for the signer.
         //Again, in practice, these would probably be created in a previous transaction
         ring.push(Enote::new(
-            random_point(),             //the enote's owning public key
-            Commitment(random_point())  //the pedersen commitment
+            RistrettoPoint::generate(),             //the enote's owning public key
+            Commitment(RistrettoPoint::generate())  //the pedersen commitment
         ))
     }
 
@@ -48,7 +49,7 @@ fn main() {
     ring.sort();
 
     //blinding factor of the input commitment (aka "pseudo-output")
-    let input_commitment_blinding = random_scalar();
+    let input_commitment_blinding = Scalar::generate();
 
     //The message to be signed and verified
     let message = b"this is a test";
@@ -74,14 +75,14 @@ fn main() {
     let mut ring: Ring = Ring::new();
     ring.push(signer_enote);
     for _ in 0..(RINGSIZE - 1) {
-        ring.push(Enote::new(random_point(), Commitment(random_point())))
+        ring.push(Enote::new(RistrettoPoint::generate(), Commitment(RistrettoPoint::generate())))
     }
     ring.sort();
-    let (_, signature2) = MLSAGSignature::sign(
-        &ring, signer_keys, random_scalar(), b"another test"
+    let (_, signature_2) = MLSAGSignature::sign(
+        &ring, signer_keys, Scalar::generate(), b"another test"
     ).unwrap();
 
     //Key images will always be the same when signing with the same key,
     //regardless of other ring members, the message, or the pseudo-out.
-    assert!(signature.key_image == signature2.key_image);
+    assert!(signature.key_image == signature_2.key_image);
 }

@@ -12,7 +12,6 @@ pub use crate::errors::SerializationError;
 
 ///Implements functions to convert to (`to_bytes`) and from (`from_bytes`) bytes
 ///for most data types in this crate.
-#[cfg(feature = "to_bytes")]
 pub trait ToBytes<'a>: Sized + Serialize + Deserialize<'a> {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return match bincode::serialize(self) {

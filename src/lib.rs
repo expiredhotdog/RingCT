@@ -12,7 +12,7 @@ extern crate lazy_static;
 mod types;
 pub use types::*;
 mod tobytes;
-#[cfg(feature = "to_bytes")]
+
 pub use tobytes::ToBytes;
 
 

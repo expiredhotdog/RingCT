@@ -1,7 +1,10 @@
 // SPDX short identifier: Unlicense
 
 use ringct::{
-    curve::random_scalar,
+    curve::{
+        Scalar,
+        Random
+    },
     rangeproof::BorromeanRangeProof
 };
 
@@ -15,7 +18,7 @@ fn main() {
     let (commitment, proof) = BorromeanRangeProof::prove(
         123456789,      //value of the Pedersen commitment (in atomic units, for example piconeros:
                             //https://web.getmonero.org/resources/moneropedia/atomic-units.html)
-        random_scalar() //blinding factor of the Pedersen commitment
+        Scalar::generate() //blinding factor of the Pedersen commitment
     ).expect("Real software should have proper error handling.");
 
     //Verify the rangeproof

@@ -8,15 +8,21 @@ use criterion::{
     BenchmarkId
 };
 use std::time::Duration;
-use ringct::address::ECDHPrivateKey;
+use ringct::{
+    curve::{
+        Scalar,
+        Random
+    },
+    address::ECDHPrivateKey,
+};
 
 fn ecdh_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("ECDH");
     group.sample_size(100);
     group.measurement_time(Duration::from_secs(3));
 
-    let sk1 = ECDHPrivateKey::generate();
-    let sk2 = ECDHPrivateKey::generate();
+    let sk1 = Scalar::generate();
+    let sk2 = Scalar::generate();
     let pk2 = sk2.to_public();
 
     let ss1 = sk1.shared_secret(&pk2);

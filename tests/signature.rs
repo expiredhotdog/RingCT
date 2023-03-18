@@ -1,7 +1,5 @@
 // SPDX short identifier: Unlicense
 
-#![allow(unused, unused_mut)]
-
 use rand::{thread_rng, Rng};
 
 use ringct::{
@@ -21,15 +19,15 @@ fn mlsag_test() {
         let mut ring: Ring = Ring::new();
         for _ in 0..x {
             let _enote_keys = EnoteKeys {
-                owner: random_scalar(),
+                owner: Scalar::generate(),
                 value: thread_rng().gen::<u64>(),
-                blinding: random_scalar()
+                blinding: Scalar::generate()
             };
             enote_keys.push(_enote_keys.clone());
             ring.push(_enote_keys.to_enote());
         }
         let my_key = &enote_keys[thread_rng().gen::<usize>() % x];
-        let out_blinding = random_scalar();
+        let out_blinding = Scalar::generate();
 
         ring.sort();
 
@@ -47,13 +45,10 @@ fn mlsag_test() {
         let (pseudo_out, sig) = MLSAGSignature::sign(
             &ring, my_key.to_owned(), out_blinding, b"abcdef").unwrap();
 
-        let mut deserialized = sig.clone();
-        #[cfg(feature = "to_bytes")]
-        {
-            //serialize
-            let serialized = sig.to_bytes().unwrap();
-            deserialized = MLSAGSignature::from_bytes(&serialized).unwrap();
-        }
+        //serialize
+        let serialized = sig.to_bytes().unwrap();
+        let deserialized = MLSAGSignature::from_bytes(&serialized).unwrap();
+
 
         //sanity check the key image
         assert!(deserialized.key_image == my_key.get_key_image());
@@ -83,15 +78,15 @@ fn clsag_test() {
         let mut ring: Ring = Ring::new();
         for _ in 0..x {
             let _enote_keys = EnoteKeys {
-                owner: random_scalar(),
+                owner: Scalar::generate(),
                 value: thread_rng().gen::<u64>(),
-                blinding: random_scalar()
+                blinding: Scalar::generate()
             };
             enote_keys.push(_enote_keys.clone());
             ring.push(_enote_keys.to_enote());
         }
         let my_key = &enote_keys[thread_rng().gen::<usize>() % x];
-        let out_blinding = random_scalar();
+        let out_blinding = Scalar::generate();
 
         ring.sort();
 
@@ -109,13 +104,9 @@ fn clsag_test() {
         let (pseudo_out, sig) = CLSAGSignature::sign(
             &ring, my_key.to_owned(), out_blinding, b"abcdef").unwrap();
 
-        let mut deserialized = sig.clone();
-        #[cfg(feature = "to_bytes")]
-        {
-            //serialize
-            let serialized = sig.to_bytes().unwrap();
-            deserialized = CLSAGSignature::from_bytes(&serialized).unwrap();
-        }
+        //serialize
+        let serialized = sig.to_bytes().unwrap();
+        let deserialized = CLSAGSignature::from_bytes(&serialized).unwrap();
 
         //sanity check the key image
         assert!(deserialized.key_image == my_key.get_key_image());

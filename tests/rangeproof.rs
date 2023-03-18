@@ -1,7 +1,5 @@
 // SPDX short identifier: Unlicense
 
-#![allow(unused, unused_mut)]
-
 use ringct::{
     common::*,
     rangeproof::{
@@ -23,7 +21,7 @@ fn bulletproofsplus_test() {
         let mut blindings: Vec<Scalar> = Vec::new();
         for n in 0..x {
             values.push(1234567890 + n as u64);
-            blindings.push(random_scalar());
+            blindings.push(Scalar::generate());
         }
         //prove
         let (commitments, proof) = BulletPlusRangeProof::prove(
@@ -31,13 +29,9 @@ fn bulletproofsplus_test() {
 
         batched_commitments.push(commitments);
 
-        let mut deserialized = proof.clone();
-        #[cfg(feature = "to_bytes")]
-        {
-            //serialize
-            let serialized = proof.to_bytes().unwrap();
-            deserialized = BulletPlusRangeProof::from_bytes(&serialized).unwrap();
-        }
+        //serialize
+        let serialized = proof.to_bytes().unwrap();
+        let deserialized = BulletPlusRangeProof::from_bytes(&serialized).unwrap();
         batched_proofs.push(deserialized);
 
         //verify
@@ -47,11 +41,11 @@ fn bulletproofsplus_test() {
 
     //test max/min values
     let (commitments, proof) = BulletPlusRangeProof::prove(
-        vec!(0u64), vec!(random_scalar())).unwrap();
+        vec!(0u64), vec!(Scalar::generate())).unwrap();
     BulletPlusRangeProof::verify(commitments, proof).unwrap();
 
     let (commitments, proof) = BulletPlusRangeProof::prove(
-        vec!(((1u128 << BIT_RANGE) - 1) as u64), vec!(random_scalar())).unwrap();
+        vec!(((1u128 << BIT_RANGE) - 1) as u64), vec!(Scalar::generate())).unwrap();
     BulletPlusRangeProof::verify(commitments, proof).unwrap();
 }
 
@@ -59,25 +53,22 @@ fn bulletproofsplus_test() {
 fn borromean_test() {
     //prove
     let (commitment, proof) = BorromeanRangeProof::prove(
-        1234567890u64, random_scalar()).unwrap();
+        1234567890u64, Scalar::generate()).unwrap();
 
-    let mut deserialized = proof.clone();
-    #[cfg(feature = "to_bytes")]
-    {
-        //serialize
-        let serialized = proof.to_bytes().unwrap();
-        deserialized = BorromeanRangeProof::from_bytes(&serialized).unwrap();
-    }
+    //serialize
+    let serialized = proof.to_bytes().unwrap();
+    let deserialized = BorromeanRangeProof::from_bytes(&serialized).unwrap();
+
     //verify
     BorromeanRangeProof::verify(
         commitment, deserialized).unwrap();
 
     //test max/min values
     let (commitment, proof) = BorromeanRangeProof::prove(
-        0u64, random_scalar()).unwrap();
+        0u64, Scalar::generate()).unwrap();
     BorromeanRangeProof::verify(commitment, proof).unwrap();
 
     let (commitment, proof) = BorromeanRangeProof::prove(
-        ((1u128 << BIT_RANGE) - 1) as u64, random_scalar()).unwrap();
+        ((1u128 << BIT_RANGE) - 1) as u64, Scalar::generate()).unwrap();
     BorromeanRangeProof::verify(commitment, proof).unwrap();
 }

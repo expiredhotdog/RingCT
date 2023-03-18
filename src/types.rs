@@ -65,7 +65,7 @@ pub struct Commitment(
     }
 }
 
-#[cfg(feature = "to_bytes")] impl ToBytes<'_> for Commitment {
+ impl ToBytes<'_> for Commitment {
     fn to_bytes(&self) -> Result<Vec<u8>, SerializationError> {
         return Ok(self.0.compress().to_bytes().to_vec())
     }
@@ -115,7 +115,7 @@ pub struct EnoteKeys {
         self.zeroize()
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for EnoteKeys {}
+} impl ToBytes<'_> for EnoteKeys {}
 
 ///An enote represents a public key and the RingCT commitment that it is associated with.
 ///
@@ -131,13 +131,14 @@ pub struct Enote {
         return Self{owner, commitment}
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for Enote {}
+} impl ToBytes<'_> for Enote {}
 
 ///A Ring represents a vector of Enotes in a ring signature.
 ///
 ///This is a wrapper type for `Vec<Enote>`.
 ///The internal `Vec` can be accessed with `ring.0`.
 ///Some methods have been implemented for this type.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Ring(pub Vec<Enote>);
 impl Ring {
     ///Creates a new, empty ring.
@@ -168,7 +169,8 @@ impl Ring {
         let (ring_l, ring_c) = encode_rings(ring_l, ring_c);
         return ring_is_sorted(&self, &ring_l, &ring_c)
     }
-}
+
+} impl ToBytes<'_> for Ring {}
 
 ///A 1-byte public tag used to quickly eliminate an ECDH `SharedSecret` if the keys do not match.
 ///

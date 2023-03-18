@@ -4,13 +4,20 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use sha2::{Sha256, Sha512, Digest};
+use blake2::{
+    Blake2b,
+    Digest,
+    digest::consts::{U32, U64}
+};
 use crate::curve::*;
+
+type Blake2b256 = Blake2b<U32>;
+type Blake2b512 = Blake2b<U64>;
 
 ///Hash bytes to bytes, domain separated.
 ///You most likely won't need this, see `h_bytes` instead.
 pub fn domain_h_bytes(msg: &[u8], domain: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::default();
+    let mut hasher = Blake2b256::default();
     hasher.update([msg, domain].concat());
     return hasher.finalize().as_slice().try_into()
         .expect("Wrong digest length");
@@ -19,7 +26,7 @@ pub fn domain_h_bytes(msg: &[u8], domain: &[u8]) -> [u8; 32] {
 ///Hash bytes to elliptic curve point, domain separated.
 ///You most likely won't need this, see `h_point` instead.
 pub fn domain_h_point(msg: &[u8], domain: &[u8]) -> RistrettoPoint {
-    let mut hasher = Sha512::default();
+    let mut hasher = Blake2b512::default();
     hasher.update([msg, domain].concat());
     return RistrettoPoint::from_uniform_bytes(
         hasher.finalize().as_slice().try_into()
@@ -36,7 +43,7 @@ pub fn domain_h_scalar(msg: &[u8], domain: &[u8]) -> Scalar {
 
 ///Hash bytes to bytes.
 pub fn h_bytes(msg: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::default();
+    let mut hasher = Blake2b256::default();
     hasher.update(msg);
     return hasher.finalize().as_slice().try_into()
         .expect("Wrong digest length");
@@ -44,7 +51,7 @@ pub fn h_bytes(msg: &[u8]) -> [u8; 32] {
 
 ///Hash bytes to elliptic curve point.
 pub fn h_point(msg: &[u8]) -> RistrettoPoint {
-    let mut hasher = Sha512::default();
+    let mut hasher = Blake2b512::default();
     hasher.update(msg);
     return RistrettoPoint::from_uniform_bytes(
         hasher.finalize().as_slice().try_into()

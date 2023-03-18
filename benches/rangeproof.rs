@@ -32,7 +32,7 @@ fn bulletproofsplus_benchmark(c: &mut Criterion) {
         let mut blindings: Vec<Scalar> = Vec::new();
         for n in 0..x {
             values.push(1234567890 + n as u64);
-            blindings.push(random_scalar());
+            blindings.push(Scalar::generate());
         }
         let params = (values, blindings);
         group.bench_with_input(BenchmarkId::new("prove", format!("Aggregation size: {x}")), &params,
@@ -47,7 +47,7 @@ fn bulletproofsplus_benchmark(c: &mut Criterion) {
         let mut blindings: Vec<Scalar> = Vec::new();
         for n in 0..x {
             values.push(1234567890 + n as u64);
-            blindings.push(random_scalar());
+            blindings.push(Scalar::generate());
         }
 
         let (commitment, proof) = BulletPlusRangeProof::prove(values, blindings).unwrap();
@@ -84,7 +84,7 @@ fn bulletproofsplus_benchmark(c: &mut Criterion) {
 
 fn borromean_benchmark(c: &mut Criterion) {
     //prove
-    let params = (1234567890u64, random_scalar());
+    let params = (1234567890u64, Scalar::generate());
     c.bench_with_input(BenchmarkId::new("Borromean", "prove"), &params,
         |b, (value, blinding)| b.iter(|| {
             BorromeanRangeProof::prove(value.to_owned(), blinding.to_owned())
@@ -92,7 +92,7 @@ fn borromean_benchmark(c: &mut Criterion) {
 
 
     //verify
-    let params = BorromeanRangeProof::prove(1234567890u64, random_scalar()).unwrap();
+    let params = BorromeanRangeProof::prove(1234567890u64, Scalar::generate()).unwrap();
     c.bench_with_input(BenchmarkId::new("Borromean", "verify"), &params,
         |b, (commitment, proof)| b.iter(|| {
             black_box(BorromeanRangeProof::verify(commitment.to_owned(), proof.to_owned()).unwrap());

@@ -79,29 +79,6 @@ pub struct MLSAGSignature {
         )
     }
 
-    ///Same as `sign`, except the ring is automatically sorted. `ring` must be mutable.
-    ///
-    ///This is slightly more efficient than sorting separately.
-    pub fn sign_and_sort(
-        ring: &mut Ring, enote_keys: EnoteKeys, pseudo_out_blinding: Scalar, msg: &[u8]
-    ) -> Result<(Commitment, Self), SignatureError> {
-        let [ring_l, unshifted_ring_c] = separate_ring(ring);
-        let (encoded_ring_l, encoded_ring_c) = encode_rings(ring_l.clone(), unshifted_ring_c.clone());
-
-        ring.0 = ring_as_sorted(ring, &encoded_ring_l, &encoded_ring_c).0;
-
-        return Self::sign_internal(
-            ring,
-            ring_l,
-            unshifted_ring_c,
-            encoded_ring_l,
-            encoded_ring_c,
-            enote_keys,
-            pseudo_out_blinding,
-            msg
-        )
-    }
-
     ///Internal signing function.
     fn sign_internal(
         //So many parameters :(
@@ -309,4 +286,4 @@ pub struct MLSAGSignature {
         };
     }
 
-} #[cfg(feature = "to_bytes")] impl ToBytes<'_> for MLSAGSignature {}
+} impl ToBytes<'_> for MLSAGSignature {}

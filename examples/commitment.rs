@@ -3,7 +3,7 @@
 use ringct::{
     curve::{
         Scalar,
-        random_scalar
+        Random
     },
     Commitment,
 };
@@ -13,40 +13,40 @@ fn main() {
         //https://web.getmonero.org/resources/moneropedia/atomic-units.html)
     let value: u64 = 123;
     //Blinding factor of the Pedersen commitment
-    let blinding: Scalar = random_scalar();
+    let blinding: Scalar = Scalar::generate();
 
     //Create a commitment
     let commitment = Commitment::commit(value, blinding.clone());
 
     //Create another commitment with the same blinding factor, but different value
-    let commitment2 = Commitment::commit(120, blinding);
+    let commitment_2 = Commitment::commit(120, blinding);
 
     //Difference between the values
     let extra = 123 - 120;
     //Verify that the "equation" is balanced: c1 == c2 + extra.
     //Both the values and blinding factors must be perfectly balanced on each side.
-    assert!(Commitment::is_balanced(vec!(commitment), vec!(commitment2), extra));
+    assert!(Commitment::is_balanced(vec!(commitment), vec!(commitment_2), extra));
 
 
     //A more complex equation:
-    let blinding1 = random_scalar();
-    let blinding2 = random_scalar();
-    let blinding3 = blinding1 - blinding2;
+    let blinding_1 = Scalar::generate();
+    let blinding_2 = Scalar::generate();
+    let blinding_3 = blinding_1 - blinding_2;
 
-    let commitment1 = Commitment::commit(1000, blinding1);
-    let commitment2 = Commitment::commit(750, blinding2);
-    let commitment3 = Commitment::commit(200, blinding3);
+    let commitment_1 = Commitment::commit(1000, blinding_1);
+    let commitment_2 = Commitment::commit(750, blinding_2);
+    let commitment_3 = Commitment::commit(200, blinding_3);
 
     //c1 == c2 + c3 + extra
-    assert!(Commitment::is_balanced(vec!(commitment1), vec!(commitment2, commitment3), 50));
+    assert!(Commitment::is_balanced(vec!(commitment_1), vec!(commitment_2, commitment_3), 50));
 
 
     //More complex:
-    let in_blinding_1 = random_scalar();
-    let in_blinding_2 = random_scalar();
-    let in_blinding_3 = random_scalar();
+    let in_blinding_1 = Scalar::generate();
+    let in_blinding_2 = Scalar::generate();
+    let in_blinding_3 = Scalar::generate();
 
-    let out_blinding_1 = random_scalar();
+    let out_blinding_1 = Scalar::generate();
     let out_blinding_2 = (in_blinding_1 + in_blinding_2 + in_blinding_3) - out_blinding_1;
 
     let in_commitment_1 = Commitment::commit(100_000, in_blinding_1);
