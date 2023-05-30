@@ -41,7 +41,7 @@ fn get_output_hash(outputs: &Vec<(Recipient, Commitment)>) -> [u8; 32] {
     for output in outputs {
         let bytes = [
             output.0.to_bytes().expect("Real software should have proper error handling."), //Recipient
-            output.0.to_bytes().expect("Real software should have proper error handling.")  //Commitment
+            output.1.to_bytes().expect("Real software should have proper error handling.")  //Commitment
         ].concat();
         output_bytes.extend(bytes);
     }
