@@ -20,8 +20,8 @@ mod mlsag;
 mod clsag;
 mod signature_utils;
 
-pub use mlsag::MLSAGSignature;
-pub use clsag::CLSAGSignature;
+pub use mlsag::{MLSAGSignature, MLSAGSignatureInternal};
+pub use clsag::{CLSAGSignature, CLSAGSignatureInternal};
 
 pub(crate) use signature_utils::{
     separate_ring,
