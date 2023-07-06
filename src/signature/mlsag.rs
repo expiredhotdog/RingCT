@@ -19,6 +19,16 @@ fn create_message(
     return h_bytes(&[msg, &encoded_ring_l.concat(), &encoded_ring_c.concat(), &encoded_points.concat()].concat());
 }
 
+
+///Internal components of an MLSAG signature
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MLSAGSignatureInternal {
+    e_0: Scalar,
+    s: [Vec<Scalar>; 2]
+}
+impl ToBytes<'_> for MLSAGSignatureInternal {}
+
+
 ///A RingCT ring signature.
 ///
 ///MLSAG stands for "Multilayered Linkable Spontaneous Anonymous Group (signature)"
@@ -284,6 +294,33 @@ pub struct MLSAGSignature {
             true => Ok(()),
             false => Err(SignatureError::Invalid)
         };
+    }
+
+    pub fn get_key_image(&self) -> RistrettoPoint {
+        self.key_image
+    }
+
+    ///Separate internal proof components from the key image.
+    ///This is potentially useful for pruning.
+    ///
+    ///Returns `(key_image, internal_components)`
+    pub fn to_separate(&self) -> (RistrettoPoint, MLSAGSignatureInternal) {
+        (
+        self.key_image,
+        MLSAGSignatureInternal{
+            e_0: self.e_0,
+            s: self.s.to_owned(),
+        }
+        )
+    }
+
+    ///Combine separate proof components back together.
+    pub fn from_separate(key_image: RistrettoPoint, internal: MLSAGSignatureInternal) -> MLSAGSignature {
+        MLSAGSignature{
+            key_image,
+            e_0: internal.e_0,
+            s: internal.s.to_owned(),
+        }
     }
 
 } impl ToBytes<'_> for MLSAGSignature {}
